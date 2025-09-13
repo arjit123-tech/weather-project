@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather App</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f0f4f8; /* Light gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .container {
+            max-width: 480px;
+            width: 100%;
+        }
+
+        /* Custom styles for the weather app container */
+        .weather-card {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease-in-out;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 2rem;
+            height: 2rem;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .weather-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            margin-top: 1.5rem;
+            animation: fadeIn 0.8s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-box {
+            position: fixed;
+            top: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 2rem;
+            background-color: #fca5a5;
+            color: #b91c1c;
+            border-radius: 0.75rem;
+            font-weight: 500;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            display: none;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { top: 0; opacity: 0; }
+            to { top: 2rem; opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main Container -->
+    <div class="container weather-card">
+        <h1 class="text-3xl font-bold text-gray-800 text-center mb-6">Weather App</h1>
+        
+        <div class="input-group">
+            <input type="text" id="city-input" placeholder="Enter city name..."
+                class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+            <button id="search-button"
+                class="px-6 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all">
+                Search
+            </button>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading-spinner" class="mt-8 flex justify-center hidden">
+            <div class="loading-spinner"></div>
+        </div>
+
+        <!-- Weather Display Area -->
+        <div id="weather-display" class="hidden">
+            <!-- Weather information will be injected here by JavaScript -->
+        </div>
+
+        <!-- Message Box -->
+        <div id="message-box" class="message-box"></div>
+    </div>
+
+    <script>
+        // API Key and URL
+        const apiKey = "2c8a73a6ba9b4596bfb113753251309";
+        const apiUrl = "https://api.weatherapi.com/v1/current.json";
+
+        // DOM elements
+        const cityInput = document.getElementById("city-input");
+        const searchButton = document.getElementById("search-button");
+        const weatherDisplay = document.getElementById("weather-display");
+        const loadingSpinner = document.getElementById("loading-spinner");
+        const messageBox = document.getElementById("message-box");
+
+        // Function to show a temporary message
+        function showMessage(message, type = 'error') {
+            messageBox.textContent = message;
+            messageBox.style.display = 'block';
+            if (type === 'error') {
+                messageBox.classList.remove('bg-green-200', 'text-green-800');
+                messageBox.classList.add('bg-red-200', 'text-red-800');
+            } else {
+                messageBox.classList.remove('bg-red-200', 'text-red-800');
+                messageBox.classList.add('bg-green-200', 'text-green-800');
+            }
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 3000);
+        }
+
+        // Function to fetch weather data
+        async function getWeatherData(city) {
+            if (!city) {
+                showMessage("Please enter a city name.");
+                return;
+            }
+
+            // Clear previous content and show spinner
+            weatherDisplay.innerHTML = '';
+            weatherDisplay.classList.add('hidden');
+            loadingSpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${apiUrl}?key=${apiKey}&q=${city}&aqi=yes`);
+                const data = await response.json();
+
+                if (!response.ok || data.error) {
+                    throw new Error(data.error.message || "City not found. Please try again.");
+                }
+
+                displayWeather(data);
+            } catch (error) {
+                console.error("Error fetching weather data:", error);
+                showMessage(error.message);
+            } finally {
+                loadingSpinner.classList.add('hidden');
+            }
+        }
+
+        // Function to display the weather information
+        function displayWeather(data) {
+            const { location, current } = data;
+            const weatherHTML = `
+                <div class="weather-info">
+                    <h2 class="text-xl md:text-2xl font-semibold text-gray-700">${location.name}, ${location.country}</h2>
+                    <p class="text-sm text-gray-500">${current.last_updated}</p>
+                    <img src="${current.condition.icon}" alt="Weather icon" class="w-24 h-24 my-2">
+                    <p class="text-5xl font-bold text-gray-800">${Math.round(current.temp_c)}°C</p>
+                    <p class="text-xl font-medium text-gray-600">${current.condition.text}</p>
+                    <div class="grid grid-cols-2 gap-4 mt-6 w-full">
+                        <div class="bg-blue-50 p-4 rounded-lg flex flex-col items-center">
+                            <span class="text-sm text-gray-500">Feels Like</span>
+                            <span class="font-bold text-lg text-blue-700">${Math.round(current.feelslike_c)}°C</span>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg flex flex-col items-center">
+                            <span class="text-sm text-gray-500">Humidity</span>
+                            <span class="font-bold text-lg text-blue-700">${current.humidity}%</span>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg flex flex-col items-center">
+                            <span class="text-sm text-gray-500">Wind</span>
+                            <span class="font-bold text-lg text-blue-700">${current.wind_kph} kph</span>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg flex flex-col items-center">
+                            <span class="text-sm text-gray-500">UV Index</span>
+                            <span class="font-bold text-lg text-blue-700">${current.uv}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            weatherDisplay.innerHTML = weatherHTML;
+            weatherDisplay.classList.remove('hidden');
+        }
+
+        // Event listeners
+        searchButton.addEventListener("click", () => {
+            getWeatherData(cityInput.value.trim());
+        });
+
+        cityInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                getWeatherData(cityInput.value.trim());
+            }
+        });
+    </script>
+</body>
+</html>
